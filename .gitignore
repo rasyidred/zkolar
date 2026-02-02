@@ -12,3 +12,11 @@ docs/
 
 # Dotenv file
 .env
+
+# ZK Artifacts
+circuits/build/
+*.r1cs
+*.zkey
+*.ptau
+*.wasm
+*.wcd

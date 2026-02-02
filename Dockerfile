@@ -18,8 +18,8 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user for security
-RUN useradd -m -u 1000 -s /bin/bash zkolar
+# Use existing node user (UID 1000) for security
+# The node:20-bookworm-slim image already has a 'node' user with UID 1000
 
 # ============================================================================
 # Builder Stage: Install build-time tools (Foundry, Circom)
@@ -54,20 +54,20 @@ COPY --from=builder /usr/local/bin/circom /usr/local/bin/circom
 WORKDIR /app
 
 # Copy dependency manifests first (leverage Docker layer caching)
-COPY --chown=zkolar:zkolar package*.json ./
-COPY --chown=zkolar:zkolar foundry.toml ./
+COPY --chown=node:node package*.json ./
+COPY --chown=node:node foundry.toml ./
 
 # Install Node.js dependencies (production only)
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 # Copy project files
-COPY --chown=zkolar:zkolar . .
+COPY --chown=node:node . .
 
 # Make all scripts executable
-RUN chmod +x scripts/*.sh 2>/dev/null || true
+RUN chmod +x bin/*.sh 2>/dev/null || true
 
 # Switch to non-root user for security
-USER zkolar
+USER node
 
 # Default command: compile circuits (if any) and run tests
-CMD ["/bin/bash", "-c", "./scripts/compile_circuit.sh && forge test -vv"]
+CMD ["/bin/bash", "-c", "./bin/compile_circuit.sh && forge test -vv"]

@@ -24,7 +24,7 @@ Zkolar/
 │   ├── input.json           <-- Dummy data for testing the circuit
 │   └── build/               <-- (GitIgnored) Compiled .wasm, .zkey, .r1cs
 │
-├── scripts/                 <-- THE GLUE (Automation)
+├── bin/                     <-- THE GLUE (Automation)
 │   ├── compile_circuit.sh   <-- Script to compile circom & generate Verifier.sol
 │   └── generate_proof.js    <-- The "User App": Takes inputs, spits out proof.json
 │
@@ -60,7 +60,7 @@ This is the "Verification Machine." It runs on Ethereum/EVM.
   - **Struct:** `StudentData { bytes32 commitment; bool hasCredential; }`
   - **Logic:** Stores the University's "Commitment" to the student's grade. Calls `Verifier.verifyProof()` when an Employer asks.
 
-### C. The Glue Scripts (`scripts/`)
+### C. The Glue Scripts (`bin/`)
 
 This is what makes you look like a Lead Engineer. You automate the boring stuff.
 

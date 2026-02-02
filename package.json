@@ -4,7 +4,7 @@
   "description": "Zero-Knowledge Grade Verification System",
   "private": true,
   "scripts": {
-    "compile:circuit": "./scripts/compile_circuit.sh",
+    "compile:circuit": "./bin/compile_circuit.sh",
     "test": "forge test -vv"
   },
   "dependencies": {
