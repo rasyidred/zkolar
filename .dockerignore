@@ -1,0 +1,31 @@
+# Build artifacts
+circuits/build/
+*.r1cs
+*.zkey
+*.ptau
+*.wasm
+out/
+cache/
+broadcast/
+
+# Dependencies
+node_modules/
+lib/
+
+# Git
+.git/
+.gitignore
+.gitmodules
+.history/
+
+# Documentation
+*.md
+!README.md
+
+# Environment
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
