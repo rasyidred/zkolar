@@ -45,127 +45,53 @@ Zkolar/
 
 ## Prerequisites
 
-### Required Tools
+- Docker
 
-- **Node.js** (≥20.0.0) - For snarkjs and witness generation
-- **Circom** (v2.1.8+) - Circuit compiler
-- **Foundry** - Solidity development toolkit
-- **Rust & Cargo** (Optional) - For .wcd generation (debugging)
-
-### Installation
-
-#### 1. Install Foundry
-```bash
-curl -L https://foundry.paradigm.xyz | bash
-foundryup
-```
-
-#### 2. Install Circom
-```bash
-# Via Rust
-cargo install --git https://github.com/iden3/circom.git
-
-# Or download prebuilt binary (Linux)
-curl -L -o /usr/local/bin/circom \
-  https://github.com/iden3/circom/releases/download/v2.1.8/circom-linux-amd64
-chmod +x /usr/local/bin/circom
-```
-
-#### 3. Install Node.js Dependencies
-```bash
-npm install
-```
-
-## Usage
-
-### Circuit Compilation
-
-The `bin/compile_circuit.sh` script provides a complete workflow for circuit compilation:
+## Quick Start
 
 ```bash
-# Compile all circuits in circuits/
-./bin/compile_circuit.sh
-
-# Compile specific circuit
-./bin/compile_circuit.sh circuits/circuit1.circom
-
-# Use custom power of tau
-./bin/compile_circuit.sh -t 20 circuits/circuit1.circom
-
-# Via npm
-npm run compile:circuit
-```
-
-**What it does:**
-1. Downloads powers of tau file (cached)
-2. Compiles circuit with circom (→ .r1cs, .wasm)
-3. Generates witness with snarkjs
-4. Performs Groth16 trusted setup (→ .zkey)
-5. Generates and verifies proof
-6. Exports Verifier.sol contract
-7. **Auto-copies Verifier.sol to src/** for Foundry
-8. (Optional) Generates .wcd file for debugging
-
-**Outputs:**
-```
-circuits/build/
-├── circuit1.r1cs              # Constraint system
-├── circuit1_js/
-│   └── circuit1.wasm          # Witness generator
-├── circuit1.wtns              # Witness file
-├── circuit1_<hash>_final.zkey # Proving key
-├── circuit1_proof.json        # Generated proof
-└── circuit1_<hash>_verifier.sol  # Verifier contract
-
-src/
-└── Verifier.sol               # Auto-copied for Foundry
-```
-
-### Smart Contract Development
-
-```bash
-# Build contracts
-forge build
-
-# Run tests
-forge test
-
-# Run tests with verbosity
-forge test -vv
-
-# Format code
-forge fmt
-
-# Deploy (example)
-forge script script/Counter.s.sol:CounterScript \
-  --rpc-url <your_rpc_url> \
-  --private-key <your_private_key>
-```
-
-### Docker Workflow
-
-The project includes a multi-stage Dockerfile that sets up the complete environment:
-
-```bash
-# Build Docker image
 docker build -t zkolar .
-
-# The default command compiles circuits and runs tests
 docker run zkolar
-
-# Interactive shell
-docker run -it zkolar /bin/bash
-
-# Mount local code for development
-docker run -v $(pwd):/app zkolar
 ```
 
-**Docker features:**
-- Node.js 20 (slim Debian)
-- Circom v2.1.8
-- Foundry (forge, cast, anvil)
-- All npm dependencies
-- Automatic circuit compilation on startup
+**What `docker run zkolar` does:**
+1. Auto-install dependencies (forge-std, etc.)
+2. Compile circuits → Generate `src/Verifier.sol`
+3. Run Foundry tests
+
+**With volume mounts (Windows):**
+```bash
+docker run -v "${PWD}/src:/app/src" -v "${PWD}/circuits:/app/circuits" zkolar
+```
+
+## Adding Dependencies (Maintainers Only)
+
+**For maintainers** adding new libraries to the project:
+
+```bash
+git submodule add https://github.com/OpenZeppelin/openzeppelin-contracts lib/openzeppelin-contracts
+docker build -t zkolar .
+```
+
+**For users** cloning the repo: No action needed - all dependencies are included and auto-installed.
+
+## Manual Commands
+
+### Compile Circuit → Generate Verifier
+```bash
+docker run zkolar ./bin/compile_circuit.sh
+```
+Output: `src/Verifier.sol`
+
+### Compile Solidity Contracts
+```bash
+docker run zkolar forge build
+```
+
+### Run Tests
+```bash
+docker run zkolar forge test -vv
+```
 
 ## Development Workflow
 

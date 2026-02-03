@@ -149,15 +149,15 @@ compile_circuit() {
     time node "${circuit_name}"_js/generate_witness.js \
         "${circuit_name}"_js/"${circuit_name}".wasm \
         ../../"${inputs_path}" \
-        "$witness_path"
+        "${circuit_name}.wtns"
 
     # Verify witness against r1cs
-    snarkjs wtns check "$r1cs_path" "$witness_path"
+    snarkjs wtns check "${circuit_name}.r1cs" "${circuit_name}.wtns"
 
     echo -e "${YELLOW}[3/6] Performing Groth16 trusted setup...${NC}"
     if [ ! -f "$zkey_path" ]; then
         # Initial setup
-        snarkjs groth16 setup "$r1cs_path" ../../"$ptau_path" "${circuit_name}"_0000.zkey
+        snarkjs groth16 setup "${circuit_name}.r1cs" ../../"$ptau_path" "${circuit_name}"_0000.zkey
 
         # Single contribution (sufficient for development)
         local ENTROPY
@@ -170,7 +170,7 @@ compile_circuit() {
             -e="$ENTROPY"
 
         # Verify zkey
-        snarkjs zkey verify "$r1cs_path" ../../"$ptau_path" "$zkey_path"
+        snarkjs zkey verify "${circuit_name}.r1cs" ../../"$ptau_path" "$zkey_path"
         echo -e "${GREEN}✓ Trusted setup complete${NC}"
     else
         echo -e "${GREEN}✓ Using existing zkey: $zkey_path${NC}"
@@ -182,8 +182,8 @@ compile_circuit() {
     fi
 
     echo -e "${YELLOW}[5/6] Generating and verifying proof...${NC}"
-    snarkjs groth16 prove "$zkey_path" "$witness_path" "$proof_path" "$public_signals_path"
-    snarkjs groth16 verify "$vk_path" "$public_signals_path" "$proof_path"
+    snarkjs groth16 prove "$zkey_path" "${circuit_name}.wtns" "${circuit_name}_proof.json" "${circuit_name}_public.json"
+    snarkjs groth16 verify "$vk_path" "${circuit_name}_public.json" "${circuit_name}_proof.json"
 
     echo -e "${YELLOW}[6/6] Exporting Solidity verifier contract...${NC}"
     snarkjs zkey export solidityverifier "$zkey_path" "$verifier_path"

@@ -1,0 +1,9 @@
+# Always use LF line endings for shell scripts
+*.sh text eol=lf
+
+# Always use LF for Docker-related files
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+
+# Default behavior for other text files
+* text=auto

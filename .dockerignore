@@ -10,12 +10,14 @@ broadcast/
 
 # Dependencies
 node_modules/
-lib/
+# NOTE: lib/ is NOT excluded - we need Foundry dependencies (forge-std, etc)
 
-# Git
+# Git (most git files excluded except what's needed for submodules)
 .git/
+!.git/config
+!.git/HEAD
+!.git/modules/
 .gitignore
-.gitmodules
 .history/
 
 # Documentation

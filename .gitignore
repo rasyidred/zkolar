@@ -20,3 +20,6 @@ circuits/build/
 *.ptau
 *.wasm
 *.wcd
+*.wtns
+*.sym
+*_js/
