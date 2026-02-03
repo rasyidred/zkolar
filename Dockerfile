@@ -43,6 +43,9 @@ RUN curl -L -o /usr/local/bin/circom \
 # ============================================================================
 FROM base AS runtime
 
+# Build argument for power of tau (default: 18)
+ARG POWER_OF_TAU=18
+
 # Copy Foundry binaries from official Foundry image
 COPY --from=foundry /usr/local/bin/forge /usr/local/bin/forge
 COPY --from=foundry /usr/local/bin/cast /usr/local/bin/cast
@@ -71,12 +74,22 @@ RUN npm install --omit=dev && \
     npm install -g snarkjs && \
     npm cache clean --force
 
-# Copy Foundry dependencies (lib/) before copying project files
-# This ensures forge-std and other dependencies are available
-COPY --chown=node:node lib/ ./lib/
+# Pre-download powers of tau file at build time (baked into image)
+RUN mkdir -p circuits/build/ptau_files && \
+    curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_${POWER_OF_TAU}.ptau \
+         -o circuits/build/ptau_files/powersOfTau28_hez_final_${POWER_OF_TAU}.ptau && \
+    chown -R node:node circuits/
 
 # Copy project files
 COPY --chown=node:node . .
+
+# Install Foundry dependencies AFTER copying project files
+# Clean existing lib/ and clone fresh to avoid submodule issues
+RUN rm -rf lib/forge-std lib/openzeppelin-contracts && \
+    git clone --depth 1 https://github.com/foundry-rs/forge-std lib/forge-std && \
+    git clone --depth 1 https://github.com/OpenZeppelin/openzeppelin-contracts lib/openzeppelin-contracts && \
+    rm -rf lib/forge-std/.git lib/openzeppelin-contracts/.git && \
+    chown -R node:node lib/
 
 # Fix line endings and make scripts executable
 RUN apt-get update && apt-get install -y dos2unix && \
@@ -92,5 +105,5 @@ RUN mkdir -p out cache && chown -R node:node out cache
 # Switch to non-root user for security
 USER node
 
-# Default command: install dependencies, compile circuits, and run tests
-CMD ["/bin/bash", "-c", "./bin/install_foundry_deps.sh && ./bin/compile_circuit.sh && echo 'Running Foundry tests...' && forge test -vv"]
+# Default command: compile circuits and run tests (dependencies pre-installed in image)
+CMD ["/bin/bash", "-c", "./bin/compile_circuit.sh && echo 'Running Foundry tests...' && forge test -vv"]

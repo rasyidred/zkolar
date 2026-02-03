@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # Configuration
-POWER_OF_TAU=18
+POWER_OF_TAU=15
 CIRCUITS_DIR="circuits"
 BUILD_DIR="${CIRCUITS_DIR}/build"
 SRC_DIR="src"
@@ -47,8 +47,8 @@ print_usage() {
     echo
     echo "Examples:"
     echo "  $0                                    # Compile all circuits"
-    echo "  $0 circuits/circuit1.circom           # Compile specific circuit"
-    echo "  $0 -t 20 circuits/circuit1.circom     # Use power of tau 20"
+    echo "  $0 circuits/grade_check.circom           # Compile specific circuit"
+    echo "  $0 -t 20 circuits/grade_check.circom     # Use power of tau 20"
 }
 
 # Parse command line options
@@ -95,20 +95,26 @@ fi
 
 # Function to compile a single circuit
 compile_circuit() {
-    local circuit_path=$1
+    local circuit_abs_path=$1    # Absolute path for validation/logging
+    local circuit_rel_path=$2    # Relative path for file access
+
+    # For backward compatibility and clarity
+    local circuit_path="$circuit_rel_path"
+
     echo
     echo -e "${GREEN}=====================================${NC}"
-    echo -e "${GREEN}Compiling: $circuit_path${NC}"
+    echo -e "${GREEN}Compiling: $circuit_abs_path${NC}"
     echo -e "${GREEN}=====================================${NC}"
 
     local circuit_name
-    circuit_name="$(basename "$circuit_path")" && circuit_name="${circuit_name%%.*}"
+    circuit_name="$(basename "$circuit_rel_path")" && circuit_name="${circuit_name%%.*}"
 
     local inputs_path
-    inputs_path="$(dirname "$circuit_path")/${circuit_name}.json"
+    inputs_path="$(dirname "$circuit_rel_path")/${circuit_name}.json"
 
     if [ ! -f "$inputs_path" ]; then
         echo -e "${RED}Error: Inputs file not found at $inputs_path${NC}"
+        echo "Expected location: $(dirname "$circuit_abs_path")/${circuit_name}.json"
         echo "Please create an inputs JSON file for your circuit"
         exit 1
     fi
@@ -188,37 +194,16 @@ compile_circuit() {
     echo -e "${YELLOW}[6/6] Exporting Solidity verifier contract...${NC}"
     snarkjs zkey export solidityverifier "$zkey_path" "$verifier_path"
 
-    # Copy verifier to src/ directory
-    local src_verifier="${SRC_DIR}/Verifier.sol"
-    cp "$verifier_path" ../../"$src_verifier"
+    # Copy verifier to src/ directory with circuit-specific name
+    # Convert circuit name to PascalCase (e.g., grade_check → GradeCheck)
+    local verifier_contract_name=$(echo "$circuit_name" | sed -r 's/(^|_)([a-z])/\U\2/g')
+    local src_verifier="${SRC_DIR}/${verifier_contract_name}Verifier.sol"
+
+    echo -e "${YELLOW}Generating ${verifier_contract_name}Verifier.sol...${NC}"
+
+    # Update contract name in Solidity file and copy
+    sed "s/contract Groth16Verifier/contract ${verifier_contract_name}Verifier/g" "$verifier_path" > ../../"$src_verifier"
     echo -e "${GREEN}✓ Verifier contract copied to ${src_verifier}${NC}"
-
-    # Optional: Generate .wcd file for debugging/alternative witness calculators
-    local wcd_path="${circuit_name}.wcd"
-    if command -v cargo &>/dev/null; then
-        echo
-        echo -e "${YELLOW}[Bonus] Generating .wcd file for alternative witness calculation...${NC}"
-
-        # Check if bin directory has Rust project
-        if [ -d "../../bin/Cargo.toml" ] || [ -f "../../Cargo.toml" ]; then
-            pushd "../.." >/dev/null
-            if cargo build --release --workspace 2>&1 | grep -q "Finished\|Compiling"; then
-                if [ -f "target/release/build-circuit" ]; then
-                    time target/release/build-circuit "$circuit_path" "${BUILD_DIR}/${wcd_path}"
-                    echo -e "${GREEN}✓ .wcd file generated${NC}"
-                else
-                    echo -e "${YELLOW}ℹ build-circuit binary not found, skipping .wcd generation${NC}"
-                fi
-            else
-                echo -e "${YELLOW}ℹ Rust project build not available, skipping .wcd generation${NC}"
-            fi
-            popd >/dev/null
-        else
-            echo -e "${YELLOW}ℹ Rust project not found, skipping .wcd generation${NC}"
-        fi
-    else
-        echo -e "${YELLOW}ℹ cargo not found, skipping optional .wcd generation${NC}"
-    fi
 
     popd >/dev/null
 
@@ -233,9 +218,6 @@ compile_circuit() {
     echo "  Zkey:     ${BUILD_DIR}/${zkey_path}"
     echo "  Proof:    ${BUILD_DIR}/${circuit_name}_proof.json"
     echo "  Verifier: ${src_verifier}"
-    if [ -f "${BUILD_DIR}/${wcd_path}" ]; then
-        echo "  WCD:      ${BUILD_DIR}/${wcd_path}"
-    fi
     echo
 }
 
@@ -243,20 +225,31 @@ compile_circuit() {
 if [ $# -gt 0 ]; then
     # Compile specified circuits
     for arg in "$@"; do
-        circuit_path=$(realpath "$arg")
-        if [ ! -f "$circuit_path" ]; then
-            echo -e "${RED}Error: Circuit file not found at $circuit_path${NC}"
+        # Validate with absolute path
+        circuit_abs_path=$(realpath "$arg")
+        if [ ! -f "$circuit_abs_path" ]; then
+            echo -e "${RED}Error: Circuit file not found at $circuit_abs_path${NC}"
             exit 1
         fi
-        compile_circuit "$circuit_path"
+
+        # Calculate relative path from project root (WORKDIR in Docker is /app)
+        # This makes the script work from any location
+        project_root=$(pwd)
+        circuit_rel_path=$(realpath --relative-to="$project_root" "$circuit_abs_path")
+
+        compile_circuit "$circuit_abs_path" "$circuit_rel_path"
     done
 else
     # Compile all circuits in circuits/ directory
     circuit_found=false
-    for circuit_path in "$CIRCUITS_DIR"/*.circom; do
-        if [ -f "$circuit_path" ]; then
+    for circuit_file in "$CIRCUITS_DIR"/*.circom; do
+        if [ -f "$circuit_file" ]; then
             circuit_found=true
-            compile_circuit "$circuit_path"
+            # Get absolute and relative paths
+            circuit_abs_path=$(realpath "$circuit_file")
+            project_root=$(pwd)
+            circuit_rel_path=$(realpath --relative-to="$project_root" "$circuit_abs_path")
+            compile_circuit "$circuit_abs_path" "$circuit_rel_path"
         fi
     done
 
