@@ -65,7 +65,7 @@ Zkolar uses the **4.0 GPA scale** (0.00-4.00) common in US/International univers
 ## Quick Start
 
 ```bash
-docker build --build-arg POWER_OF_TAU=15 -t zkolar .
+docker build -t zkolar .
 docker run zkolar
 ```
 

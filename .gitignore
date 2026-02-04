@@ -23,3 +23,6 @@ circuits/build/
 *.wtns
 *.sym
 *_js/
+
+# Test artifacts
+circuits/test_proofs/

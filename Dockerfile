@@ -43,8 +43,8 @@ RUN curl -L -o /usr/local/bin/circom \
 # ============================================================================
 FROM base AS runtime
 
-# Build argument for power of tau (default: 18)
-ARG POWER_OF_TAU=18
+# Build argument for power of tau (default: 15)
+ARG POWER_OF_TAU=15
 
 # Copy Foundry binaries from official Foundry image
 COPY --from=foundry /usr/local/bin/forge /usr/local/bin/forge
