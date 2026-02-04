@@ -43,6 +43,21 @@ Zkolar/
 2. **Proof Generation** - User generates proofs locally with private inputs
 3. **On-Chain Verification** (`src/`) - Smart contracts verify proofs on Ethereum
 
+### GPA Encoding
+
+Zkolar uses the **4.0 GPA scale** (0.00-4.00) common in US/International universities.
+
+**Fixed-Point Representation:**
+- User-facing: GPA = 3.75
+- Circuit internal: GPA = 375 (multiply by 100)
+- Valid range: 0-400 (represents 0.00-4.00)
+
+**Example:**
+- Prove "GPA >= 3.50" → Circuit checks: `380 >= 350` (internal)
+- User sees: "GPA 3.80 >= 3.50" (external)
+
+**Why?** Circom circuits only support integers. Fixed-point allows 2 decimal precision.
+
 ## Prerequisites
 
 - Docker
@@ -106,17 +121,20 @@ include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 
 template GradeCheck() {
-    signal input gpa;            // Private: actual GPA (0-100 scale)
+    signal input gpa;            // Private: actual GPA (fixed-point: value * 100, range 0-400)
     signal input salt;           // Private: random salt for commitment
-    signal input threshold;      // Public: minimum required GPA
+    signal input threshold;      // Public: minimum required GPA (fixed-point: value * 100)
     signal input identityHash;   // Public: Poseidon(gpa, salt) commitment
 
     signal output valid;
 
-    // Range proof: gpa >= threshold (7-bit inputs, max 128)
-    component greaterThan = GreaterEqThan(7);
-    greaterThan.in[0] <== gpa;
-    greaterThan.in[1] <== threshold;
+    // GPA uses 4.0 scale with 2 decimal precision (e.g., 3.75)
+    // Internally represented as fixed-point: actual_value * 100
+    // Valid range: 0-400 (represents 0.00-4.00 GPA)
+    // Bit width: 9 bits support up to 512 (sufficient for 0-400)
+    component greaterThan = GreaterEqThan(9);
+    greaterThan.in[0] <== gpa;      // e.g., 375 represents 3.75 GPA
+    greaterThan.in[1] <== threshold; // e.g., 350 represents 3.50 threshold
     valid <== greaterThan.out;
 
     // Commitment verification: prove gpa matches the committed hash
@@ -135,14 +153,16 @@ Create a corresponding `.json` file with test inputs:
 
 ```json
 {
-  "gpa": "80",
+  "gpa": "380",
   "salt": "303",
-  "threshold": "75",
-  "identityHash": "8364575429015195121375240014522732930319688692600484555979591744514770520990"
+  "threshold": "350",
+  "identityHash": "21131617122869176988314307571868451618655182931450487343413630045459166174028"
 }
 ```
 
-Note: The `identityHash` must equal `Poseidon(gpa, salt)`. Use a Poseidon hash calculator to compute this value.
+**Note:**
+- GPA values use fixed-point encoding: `380` represents GPA 3.80, `350` represents threshold 3.50
+- The `identityHash` must equal `Poseidon(gpa, salt)`. Use a Poseidon hash calculator or circomlibjs to compute this value.
 
 ### 3. Compile Circuit
 
