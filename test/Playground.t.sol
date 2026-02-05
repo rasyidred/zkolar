@@ -36,44 +36,44 @@ contract PlaygroundTest is Test {
 
         // Default placeholder values (will fail until replaced)
         uint256[2] memory a = [
-            uint(
+            uint256(
                 0x0000000000000000000000000000000000000000000000000000000000000000
             ),
-            uint(
+            uint256(
                 0x0000000000000000000000000000000000000000000000000000000000000000
             )
         ];
 
         uint256[2][2] memory b = [
             [
-                uint(
+                uint256(
                     0x0000000000000000000000000000000000000000000000000000000000000000
                 ),
-                uint(
+                uint256(
                     0x0000000000000000000000000000000000000000000000000000000000000000
                 )
             ],
             [
-                uint(
+                uint256(
                     0x0000000000000000000000000000000000000000000000000000000000000000
                 ),
-                uint(
+                uint256(
                     0x0000000000000000000000000000000000000000000000000000000000000000
                 )
             ]
         ];
 
         uint256[2] memory c = [
-            uint(
+            uint256(
                 0x0000000000000000000000000000000000000000000000000000000000000000
             ),
-            uint(
+            uint256(
                 0x0000000000000000000000000000000000000000000000000000000000000000
             )
         ];
 
         // Change to your expected valid flag (0 or 1)
-        uint256[1] memory publicSignals = [uint(0)];
+        uint256[1] memory publicSignals = [uint256(0)];
 
         // Verify the proof
         bool result = zkolar.verifyCredential(a, b, c, publicSignals);
