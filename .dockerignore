@@ -1,76 +1,41 @@
 # ============================================================================
-# Foundry
+# Git
 # ============================================================================
-cache/
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# ============================================================================
+# Dependencies (installed in container)
+# ============================================================================
+node_modules/
+# NOTE: lib/ is excluded - we clone fresh in container
+
+# ============================================================================
+# Build Artifacts (generated in container)
+# ============================================================================
 out/
+cache/
+broadcast/
 
-# Broadcast logs (keep non-local deployments)
-!/broadcast
-/broadcast/*/31337/
-/broadcast/**/dry-run/
-
-# Docs
-docs/
-TECHNICAL_OVERVIEW.md
-
-# ============================================================================
-# ZK Artifacts
-# ============================================================================
-# Ignore build intermediates
+# ZK intermediates (regenerated)
 circuits/build/*.r1cs
 circuits/build/*.sym
 circuits/build/*.wcd
 circuits/build/*.wtns
 circuits/build/*_0000.zkey
-circuits/build/*.json
-circuits/build/*.sol
-circuits/build/*.wasm
-circuits/build/generate_witness.js
-circuits/build/witness_calculator.js
-
-# Ignore ptau files (large, downloaded)
 circuits/build/ptau_files/
-*.ptau
-
-# Test proofs (regenerated)
-circuits/test_proofs/
-
-# Test inputs (generated at runtime)
-circuits/test_inputs/custom_case.json
-circuits/helpers/identity_input_*.json
 
 # ============================================================================
-# IMPORTANT: Track these artifacts for reproducible builds
+# Documentation
 # ============================================================================
-# Final zkey (contains verification key)
-!circuits/build/*_final.zkey
-
-# Verification key JSON
-!circuits/build/*_verification_key.json
-
-# WASM and witness generator
-!circuits/build/*_js/
+*.md
+!README.md
+docs/
 
 # ============================================================================
-# Dependencies
-# ============================================================================
-node_modules/
-lib/
-
-# Playground dependencies
-playground/node_modules/
-playground/package-lock.json
-
-# ============================================================================
-# Environment
-# ============================================================================
-.env
-.env.*
-!.env.example
-.claude/
-
-# ============================================================================
-# IDE
+# IDE & Editor
 # ============================================================================
 .vscode/
 .idea/
@@ -78,12 +43,32 @@ playground/package-lock.json
 *.swo
 
 # ============================================================================
-# OS
+# Environment
 # ============================================================================
-.DS_Store
-Thumbs.db
+.env
+.env.*
 
 # ============================================================================
-# Docker (don't track overrides)
+# Docker (don't include Docker files in image)
 # ============================================================================
-docker-compose.override.yml
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+Makefile
+
+# ============================================================================
+# CI/CD
+# ============================================================================
+.github/
+
+# ============================================================================
+# Windows
+# ============================================================================
+Thumbs.db
+*.exe
+
+# ============================================================================
+# Claude/AI
+# ============================================================================
+.claude/
+TECHNICAL_OVERVIEW.md
