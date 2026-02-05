@@ -503,13 +503,13 @@ After generating proof, add it to your test suite:
 ```solidity
 function testCustomCase() public view {
     // Proof values from playground
-    uint[2] memory a = [uint(0x...), uint(0x...)];
-    uint[2][2] memory b = [
+    uint256[2] memory a = [uint(0x...), uint(0x...)];
+    uint256[2][2] memory b = [
         [uint(0x...), uint(0x...)],
         [uint(0x...), uint(0x...)]
     ];
-    uint[2] memory c = [uint(0x...), uint(0x...)];
-    uint[1] memory publicSignals = [uint(1)];
+    uint256[2] memory c = [uint(0x...), uint(0x...)];
+    uint256[1] memory publicSignals = [uint256(1)];
 
     bool result = zkolar.verifyCredential(a, b, c, publicSignals);
     assertTrue(result, "Custom case should verify");
