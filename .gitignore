@@ -11,6 +11,7 @@ out/
 
 # Docs
 docs/
+TECHNICAL_OVERVIEW.md
 
 # ============================================================================
 # ZK Artifacts
@@ -21,6 +22,11 @@ circuits/build/*.sym
 circuits/build/*.wcd
 circuits/build/*.wtns
 circuits/build/*_0000.zkey
+circuits/build/*.json
+circuits/build/*.sol
+circuits/build/*.wasm
+circuits/build/generate_witness.js
+circuits/build/witness_calculator.js
 
 # Ignore ptau files (large, downloaded)
 circuits/build/ptau_files/
@@ -28,6 +34,10 @@ circuits/build/ptau_files/
 
 # Test proofs (regenerated)
 circuits/test_proofs/
+
+# Test inputs (generated at runtime)
+circuits/test_inputs/custom_case.json
+circuits/helpers/identity_input_*.json
 
 # ============================================================================
 # IMPORTANT: Track these artifacts for reproducible builds
