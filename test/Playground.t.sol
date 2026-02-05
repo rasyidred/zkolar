@@ -73,7 +73,7 @@ contract PlaygroundTest is Test {
         ];
 
         // Change to your expected valid flag (0 or 1)
-        uint256[1] memory publicSignals = [uint256(0)];
+        uint256[1] memory publicSignals = [uint256(1)];
 
         // Verify the proof
         bool result = zkolar.verifyCredential(a, b, c, publicSignals);

@@ -117,7 +117,7 @@ contract ZkolarTest is Test {
             )
         ];
 
-        uint256[1] memory publicSignals = [uint256(0)];
+        uint256[1] memory publicSignals = [uint256(1)];
 
         // Verify the proof - it should still verify because it's cryptographically valid
         bool result = zkolar.verifyCredential(a, b, c, publicSignals);
