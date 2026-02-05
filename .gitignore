@@ -1,8 +1,10 @@
-# Compiler files
+# ============================================================================
+# Foundry
+# ============================================================================
 cache/
 out/
 
-# Ignores development broadcast logs
+# Broadcast logs (keep non-local deployments)
 !/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
@@ -10,19 +12,68 @@ out/
 # Docs
 docs/
 
-# Dotenv file
-.env
-
+# ============================================================================
 # ZK Artifacts
-circuits/build/
-*.r1cs
-*.zkey
-*.ptau
-*.wasm
-*.wcd
-*.wtns
-*.sym
-*_js/
+# ============================================================================
+# Ignore build intermediates
+circuits/build/*.r1cs
+circuits/build/*.sym
+circuits/build/*.wcd
+circuits/build/*.wtns
+circuits/build/*_0000.zkey
 
-# Test artifacts
+# Ignore ptau files (large, downloaded)
+circuits/build/ptau_files/
+*.ptau
+
+# Test proofs (regenerated)
 circuits/test_proofs/
+
+# ============================================================================
+# IMPORTANT: Track these artifacts for reproducible builds
+# ============================================================================
+# Final zkey (contains verification key)
+!circuits/build/*_final.zkey
+
+# Verification key JSON
+!circuits/build/*_verification_key.json
+
+# WASM and witness generator
+!circuits/build/*_js/
+
+# ============================================================================
+# Dependencies
+# ============================================================================
+node_modules/
+lib/
+
+# Playground dependencies
+playground/node_modules/
+playground/package-lock.json
+
+# ============================================================================
+# Environment
+# ============================================================================
+.env
+.env.*
+!.env.example
+.claude/
+
+# ============================================================================
+# IDE
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ============================================================================
+# OS
+# ============================================================================
+.DS_Store
+Thumbs.db
+
+# ============================================================================
+# Docker (don't track overrides)
+# ============================================================================
+docker-compose.override.yml

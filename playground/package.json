@@ -1,0 +1,24 @@
+{
+  "name": "zkolar-playground",
+  "version": "1.0.0",
+  "description": "Interactive playground for Zkolar ZK-SNARK proof generation",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "zk-snarks",
+    "circom",
+    "zero-knowledge",
+    "playground"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "^9.2.12",
+    "circomlibjs": "^0.1.7",
+    "chalk": "^5.3.0",
+    "ora": "^7.0.1"
+  }
+}

@@ -30,8 +30,8 @@ for TEST_CASE in "${TEST_CASES[@]}"; do
     OUTPUT_FILE="${TEST_PROOFS_DIR}/${TEST_CASE}_proof.json"
     PUBLIC_FILE="${TEST_PROOFS_DIR}/${TEST_CASE}_public.json"
 
-    # Find the zkey file (should be in build/)
-    ZKEY_FILE=$(find "${BUILD_DIR}" -name "*_final.zkey" | head -n 1)
+    # Find the zkey file for this circuit (should be in build/)
+    ZKEY_FILE=$(find "${BUILD_DIR}" -name "${CIRCUIT_NAME}_*_final.zkey" | head -n 1)
     WASM_FILE="${BUILD_DIR}/${CIRCUIT_NAME}_js/${CIRCUIT_NAME}.wasm"
 
     if [ ! -f "${ZKEY_FILE}" ]; then
@@ -44,20 +44,24 @@ for TEST_CASE in "${TEST_CASES[@]}"; do
         exit 1
     fi
 
-    # Generate witness
+    # Generate witness (write to test_proofs since build may be read-only)
+    WITNESS_FILE="${TEST_PROOFS_DIR}/${TEST_CASE}_witness.wtns"
     echo "  Generating witness..."
     node "${BUILD_DIR}/${CIRCUIT_NAME}_js/generate_witness.js" \
         "${WASM_FILE}" \
         "${INPUT_FILE}" \
-        "${BUILD_DIR}/${TEST_CASE}_witness.wtns"
+        "${WITNESS_FILE}"
 
     # Generate proof
     echo "  Generating proof..."
     snarkjs groth16 prove \
         "${ZKEY_FILE}" \
-        "${BUILD_DIR}/${TEST_CASE}_witness.wtns" \
+        "${WITNESS_FILE}" \
         "${OUTPUT_FILE}" \
         "${PUBLIC_FILE}"
+
+    # Clean up witness file (not needed after proof generation)
+    rm -f "${WITNESS_FILE}"
 
     echo -e "${GREEN}  ✓ Proof generated: ${OUTPUT_FILE}${NC}"
 done

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.33;
 
-import "./IVerifier.sol";
+import "./IGradeCheckVerifier.sol";
 
 contract Zkolar {
-    IVerifier public verifier;
+    IGradeCheckVerifier public verifier;
 
     constructor(address _verifier) {
-        verifier = IVerifier(_verifier);
+        verifier = IGradeCheckVerifier(_verifier);
     }
 
     function verifyCredential(

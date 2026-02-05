@@ -1,0 +1,150 @@
+# ============================================================================
+# Zkolar Docker Compose Configuration
+# Zero-Knowledge Grade Verification System
+# ============================================================================
+
+services:
+  # ==========================================================================
+  # Development - Interactive shell with all tools
+  # ==========================================================================
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    image: zkolar:dev
+    container_name: zkolar-dev
+    stdin_open: true
+    tty: true
+    volumes:
+      # Source code - bind mounts for live editing
+      - ./circuits:/app/circuits:rw
+      - ./src:/app/src:rw
+      - ./test:/app/test:rw
+      - ./bin:/app/bin:rw
+      - ./foundry.toml:/app/foundry.toml:ro
+      - ./package.json:/app/package.json:ro
+      # Named volumes for caches (faster rebuilds)
+      - zkolar-node-modules:/app/node_modules
+      - zkolar-lib:/app/lib
+      - zkolar-cache:/app/cache
+      - zkolar-out:/app/out
+    environment:
+      - NODE_ENV=development
+      - FOUNDRY_DISABLE_NIGHTLY_WARNING=1
+    working_dir: /app
+    command: /bin/bash
+
+  # ==========================================================================
+  # Compile - Circuit compilation (ensures artifact consistency)
+  # ==========================================================================
+  compile:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    image: zkolar:dev
+    container_name: zkolar-compile
+    volumes:
+      # Source code and output directories
+      - ./circuits:/app/circuits:rw
+      - ./src:/app/src:rw
+      - ./bin:/app/bin:ro
+      - ./foundry.toml:/app/foundry.toml:ro
+      # Named volumes
+      - zkolar-node-modules:/app/node_modules:ro
+    environment:
+      - POWER_OF_TAU=${POWER_OF_TAU:-15}
+    working_dir: /app
+    command: ["./bin/compile_circuit.sh", "circuits/grade_check.circom"]
+
+  # ==========================================================================
+  # Prove - Generate proofs using compiled artifacts
+  # ==========================================================================
+  prove:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: zkolar:prod
+    container_name: zkolar-prove
+    volumes:
+      # Read-only access to compiled artifacts
+      - ./circuits/build:/app/circuits/build:ro
+      # Read input data
+      - ./circuits/test_inputs:/app/circuits/test_inputs:ro
+      # Write proofs
+      - ./circuits/test_proofs:/app/circuits/test_proofs:rw
+      # Script
+      - ./bin/generate_test_proofs.sh:/app/bin/generate_test_proofs.sh:ro
+    working_dir: /app
+    command: ["bash", "./bin/generate_test_proofs.sh"]
+
+  # ==========================================================================
+  # Test - Run Foundry tests
+  # ==========================================================================
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ci
+    image: zkolar:ci
+    container_name: zkolar-test
+    volumes:
+      - ./src:/app/src:ro
+      - ./test:/app/test:ro
+      - ./foundry.toml:/app/foundry.toml:ro
+      - zkolar-lib:/app/lib:ro
+      - zkolar-cache:/app/cache
+      - zkolar-out:/app/out
+    environment:
+      - FOUNDRY_PROFILE=ci
+      - FOUNDRY_DISABLE_NIGHTLY_WARNING=1
+    working_dir: /app
+    command: ["forge", "test", "-vvv"]
+
+  # ==========================================================================
+  # Anvil - Local Ethereum testnet
+  # ==========================================================================
+  anvil:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    image: zkolar:dev
+    container_name: zkolar-anvil
+    ports:
+      - "8545:8545"
+    command: ["anvil", "--host", "0.0.0.0"]
+    healthcheck:
+      test: ["CMD", "cast", "chain-id", "--rpc-url", "http://localhost:8545"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+# ============================================================================
+# Named Volumes
+# ============================================================================
+volumes:
+  # Node modules - faster npm install
+  zkolar-node-modules:
+    name: zkolar-node-modules
+
+  # Foundry lib dependencies
+  zkolar-lib:
+    name: zkolar-lib
+
+  # Foundry cache - faster compilation
+  zkolar-cache:
+    name: zkolar-cache
+
+  # Foundry output - compiled contracts
+  zkolar-out:
+    name: zkolar-out
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  default:
+    name: zkolar-network

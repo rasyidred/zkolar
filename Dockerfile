@@ -1,109 +1,170 @@
 # syntax=docker/dockerfile:1.4
 
 # ============================================================================
-# Base Stage: Common dependencies for all stages
+# STAGE: base - Common system dependencies
 # ============================================================================
 FROM node:20-bookworm-slim AS base
 
-# Metadata
 LABEL maintainer="zkolar"
 LABEL description="Zero-Knowledge Grade Verification System"
-LABEL version="1.0.0"
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
-    build-essential \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Use existing node user (UID 1000) for security
-# The node:20-bookworm-slim image already has a 'node' user with UID 1000
+# ============================================================================
+# STAGE: circom-builder - Build Circom from source
+# ============================================================================
+FROM rust:1.75-slim-bookworm AS circom-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build Circom from source for reproducibility
+RUN git clone --depth 1 --branch v2.1.8 https://github.com/iden3/circom.git /circom \
+    && cd /circom \
+    && cargo build --release \
+    && mv /circom/target/release/circom /usr/local/bin/circom
 
 # ============================================================================
-# Foundry Stage: Get Foundry binaries from official image
+# STAGE: foundry-builder - Get Foundry binaries
 # ============================================================================
-FROM ghcr.io/foundry-rs/foundry:latest AS foundry
-
-# ============================================================================
-# Builder Stage: Install build-time tools (Circom)
-# ============================================================================
-FROM base AS builder
-
-WORKDIR /tmp
-
-# Install Circom (pre-built binary for faster builds)
-RUN curl -L -o /usr/local/bin/circom \
-    https://github.com/iden3/circom/releases/download/v2.1.8/circom-linux-amd64 && \
-    chmod +x /usr/local/bin/circom
+FROM ghcr.io/foundry-rs/foundry:latest AS foundry-builder
 
 # ============================================================================
-# Runtime Stage: Minimal production image
+# STAGE: node-deps - Cached npm dependencies
 # ============================================================================
-FROM base AS runtime
+FROM base AS node-deps
 
-# Build argument for power of tau (default: 15)
-ARG POWER_OF_TAU=15
+WORKDIR /deps
 
-# Copy Foundry binaries from official Foundry image
-COPY --from=foundry /usr/local/bin/forge /usr/local/bin/forge
-COPY --from=foundry /usr/local/bin/cast /usr/local/bin/cast
-COPY --from=foundry /usr/local/bin/anvil /usr/local/bin/anvil
-COPY --from=foundry /usr/local/bin/chisel /usr/local/bin/chisel
-RUN chmod +x /usr/local/bin/forge /usr/local/bin/cast /usr/local/bin/anvil /usr/local/bin/chisel
+# Copy only package files for caching
+COPY package*.json ./
 
-# Copy Circom from builder stage
-COPY --from=builder /usr/local/bin/circom /usr/local/bin/circom
+# Install all dependencies (snarkjs needs its peer deps)
+RUN npm install && \
+    npm install -g snarkjs@0.7.4 && \
+    # Create a proper global snarkjs wrapper that uses local node_modules
+    mkdir -p /deps/snarkjs-global && \
+    cd /deps/snarkjs-global && \
+    npm init -y && \
+    npm install snarkjs@0.7.4
 
-# Set PATH to ensure all binaries are accessible
-ENV PATH=/usr/local/bin:$PATH
+# ============================================================================
+# STAGE: development - Full development environment
+# ============================================================================
+FROM base AS development
 
-# Suppress nightly build warning (optional)
-ENV FOUNDRY_DISABLE_NIGHTLY_WARNING=1
+# Install build-essential for native modules
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3 \
+    dos2unix \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Copy Circom from builder
+COPY --from=circom-builder /usr/local/bin/circom /usr/local/bin/circom
+
+# Copy Foundry tools
+COPY --from=foundry-builder /usr/local/bin/forge /usr/local/bin/forge
+COPY --from=foundry-builder /usr/local/bin/cast /usr/local/bin/cast
+COPY --from=foundry-builder /usr/local/bin/anvil /usr/local/bin/anvil
+COPY --from=foundry-builder /usr/local/bin/chisel /usr/local/bin/chisel
+
+# Copy node modules from node-deps stage
+COPY --from=node-deps /deps/node_modules /app/node_modules
+
+# Create snarkjs wrapper that uses local node_modules
+RUN echo '#!/bin/bash\nexec node /app/node_modules/.bin/snarkjs "$@"' > /usr/local/bin/snarkjs && \
+    chmod +x /usr/local/bin/snarkjs
+
 WORKDIR /app
-
-# Copy dependency manifests first (leverage Docker layer caching)
-COPY --chown=node:node package*.json ./
-COPY --chown=node:node foundry.toml ./
-
-# Install Node.js dependencies including snarkjs
-RUN npm install --omit=dev && \
-    npm install -g snarkjs && \
-    npm cache clean --force
-
-# Pre-download powers of tau file at build time (baked into image)
-RUN mkdir -p circuits/build/ptau_files && \
-    curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_${POWER_OF_TAU}.ptau \
-         -o circuits/build/ptau_files/powersOfTau28_hez_final_${POWER_OF_TAU}.ptau && \
-    chown -R node:node circuits/
 
 # Copy project files
 COPY --chown=node:node . .
 
-# Install Foundry dependencies AFTER copying project files
-# Clean existing lib/ and clone fresh to avoid submodule issues
-RUN rm -rf lib/forge-std lib/openzeppelin-contracts && \
-    git clone --depth 1 https://github.com/foundry-rs/forge-std lib/forge-std && \
-    git clone --depth 1 https://github.com/OpenZeppelin/openzeppelin-contracts lib/openzeppelin-contracts && \
-    rm -rf lib/forge-std/.git lib/openzeppelin-contracts/.git && \
-    chown -R node:node lib/
+# Fix line endings for scripts (Windows compatibility)
+RUN find bin -type f -name "*.sh" -exec dos2unix {} \; 2>/dev/null || true \
+    && chmod +x bin/*.sh
 
-# Fix line endings and make scripts executable
-RUN apt-get update && apt-get install -y dos2unix && \
-    find bin -type f -name "*.sh" -exec dos2unix {} \; && \
-    chmod +x bin/*.sh && \
-    apt-get remove -y dos2unix && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/* 2>/dev/null || true
+# Create directories with correct permissions
+RUN mkdir -p circuits/build node_modules out cache lib \
+    && chown -R node:node circuits/build node_modules out cache lib
 
-# Create output directories with correct permissions for node user
-RUN mkdir -p out cache && chown -R node:node out cache
+# Environment
+ENV PATH=/usr/local/bin:$PATH
+ENV FOUNDRY_DISABLE_NIGHTLY_WARNING=1
+ENV NODE_ENV=development
 
-# Switch to non-root user for security
 USER node
 
-# Default command: compile circuits and run tests (dependencies pre-installed in image)
-CMD ["/bin/bash", "-c", "./bin/compile_circuit.sh && echo 'Running Foundry tests...' && forge test -vv"]
+# Default: interactive shell
+CMD ["/bin/bash"]
+
+# ============================================================================
+# STAGE: ci - Minimal image for CI/CD testing
+# ============================================================================
+FROM base AS ci
+
+# Copy Foundry tools only
+COPY --from=foundry-builder /usr/local/bin/forge /usr/local/bin/forge
+COPY --from=foundry-builder /usr/local/bin/cast /usr/local/bin/cast
+
+# Copy node modules
+COPY --from=node-deps /deps/node_modules /app/node_modules
+
+WORKDIR /app
+
+# Copy project files
+COPY --chown=node:node . .
+
+# Create output directories
+RUN mkdir -p out cache lib \
+    && chown -R node:node out cache lib
+
+# Environment
+ENV PATH=/usr/local/bin:$PATH
+ENV FOUNDRY_PROFILE=ci
+ENV FOUNDRY_DISABLE_NIGHTLY_WARNING=1
+
+USER node
+
+# CI runs tests by default
+CMD ["forge", "test", "-vvv"]
+
+# ============================================================================
+# STAGE: production - Slim runtime for proof generation only
+# ============================================================================
+FROM node:20-bookworm-slim AS production
+
+# Minimal deps for snarkjs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy node_modules with snarkjs and all dependencies
+COPY --from=node-deps /deps/node_modules ./node_modules
+
+# Copy only what's needed for proof generation
+COPY --chown=node:node bin/generate_test_proofs.sh ./bin/
+
+# Create directories for inputs/outputs
+RUN mkdir -p circuits/build circuits/test_inputs circuits/test_proofs \
+    && chown -R node:node circuits/ bin/
+
+RUN chmod +x bin/*.sh
+
+# Create snarkjs wrapper that uses local node_modules
+RUN echo '#!/bin/bash\nexec node /app/node_modules/.bin/snarkjs "$@"' > /usr/local/bin/snarkjs && \
+    chmod +x /usr/local/bin/snarkjs
+
+ENV PATH=/usr/local/bin:$PATH
+
+USER node
+
+CMD ["snarkjs", "--help"]
