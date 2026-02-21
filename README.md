@@ -114,6 +114,18 @@ Suite result: ok. 4 passed; 0 failed
 2. Performs trusted setup (generates proving & verification keys)
 3. Exports verification key to Solidity contract
 
+**Circuit Statistics** (`grade_check`):
+
+| Metric | Value |
+|--------|-------|
+| Constraints | 250 |
+| Wires | 253 |
+| Private Inputs | 4 (`gpa`, `salt`, `threshold`, `identityHash`) |
+| Public Inputs | 0 |
+| Outputs | 1 (`valid`) |
+
+These values are displayed automatically during compilation via `snarkjs r1cs info`.
+
 **Process Flow**:
 
 ```

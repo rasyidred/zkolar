@@ -17,6 +17,7 @@ PTAU_DIR="${BUILD_DIR}/ptau_files"
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Required commands
@@ -135,6 +136,11 @@ compile_circuit() {
         --r1cs \
         --wasm \
         ../../"$circuit_path"
+
+    # Extract and display circuit info (constraints, inputs, outputs)
+    echo -e "${CYAN}Circuit Info:${NC}"
+    snarkjs r1cs info "${circuit_name}.r1cs" 2>&1 | grep -E "Constraints|Private|Public|Outputs|Wires"
+    echo
 
     # Calculate MD5 hash of r1cs for zkey naming
     local r1cs_md5
