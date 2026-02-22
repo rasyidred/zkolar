@@ -29,42 +29,42 @@ contract ZkolarTest is Test {
     function testHappyCase() public view {
         // Test case: GPA 3.80 >= threshold 3.50
         // Expected: valid = 1, verification succeeds
-        // Proof values from snarkjs soliditycalldata output (note: b array uses swapped ordering)
+        // Proof values from snarkjs zkey export soliditycalldata
 
         uint256[2] memory a = [
             uint256(
-                0x067a7f0f1137e14672fd46ae3672ce440fc2bd844087c41d4cd42131a34f7949
+                0x1d8bc209b034605b2bcd5d971b6b11491c09a6f4cad1c4725f4fcaff015df1ca
             ),
             uint256(
-                0x118f1b247852c6231a877b7d50bdc94e9e1a4326abb28b9a11d6bcbade731d34
+                0x2f3de5136d0ac9046cad16840019b73086c6802e58e106e3703b35e1b8988835
             )
         ];
 
         uint256[2][2] memory b = [
             [
                 uint256(
-                    0x139af7541dd08a6399b344ba51eeb153239a532b5d066d70b38b77bc2900ab3c
+                    0x11ea48db755c1ed542f2b5452cb25d67d513711966d30c17df31f2942fbecd16
                 ),
                 uint256(
-                    0x29051f01120caabae76ab917a9edf97edb30ec7e9890ecfe6268457e0e6db39a
+                    0x2cf448476423d883efc03e1e4e633721dcc3e61d705bf4b254592cbbd776123b
                 )
             ],
             [
                 uint256(
-                    0x21a3bda1efa6edb24ebf8100437bcc93182f4352df7a76807355a21ab548c6a4
+                    0x2f14929d9dd597b81a2e7a05d4c477ae3388e601593b595cb97ba9ce1a075230
                 ),
                 uint256(
-                    0x26bdf0c483e5950c99867f530b205099d727af663e5173a0f94d39c6de090f2e
+                    0x28064bb5452d4643e631aef688037e962cb0929f7924f8732f5f8cabb42d82a1
                 )
             ]
         ];
 
         uint256[2] memory c = [
             uint256(
-                0x21b7934496b2b90662547ebfcaf04e2ed5b096fe37afbf786c65c6fa338a7eee
+                0x29959d1e55d06cde6852020d8cd849921845e1db82f5937e2f73f5232ac02a13
             ),
             uint256(
-                0x2925f3ad1200256d87b8eb457880c749df4aa4bf7b579ed13ac624be08b7d4b2
+                0x255ac7cd7fadd74cecad4d928bdd225e8ba727598cb213abd92dedae16b932cc
             )
         ];
 
@@ -77,53 +77,53 @@ contract ZkolarTest is Test {
 
     function testBelowThresholdCase() public view {
         // Test case: GPA 3.20 < threshold 3.50
-        // Expected: valid = 0, but proof still verifies
-        // Proof values from snarkjs soliditycalldata output
+        // Expected: valid = 0, proof still verifies (valid=0 is a valid public signal)
+        // Proof values from snarkjs zkey export soliditycalldata
 
         uint256[2] memory a = [
             uint256(
-                0x05e9e75599cec852bcff7eb5fa3ef9f8b9e1b85310413ad1e78d9ee1fce723ba
+                0x1f8ef0d7894402ae7bf449662fe9e7feb54ea80c4c77be422866cab931a15d19
             ),
             uint256(
-                0x0417db249f29fdcc445c62591f52e0e8e7fbc1c0d5df98003e27be7f9915dc9c
+                0x0d7dd8284f0ab32267122b1e2d50bc1deb89d309fab431f1990ce38edb9e0b06
             )
         ];
 
         uint256[2][2] memory b = [
             [
                 uint256(
-                    0x0f7214143262b2707a518dd01e321da3bffa4f3fe660626f8a053f923ebaa15c
+                    0x0380658e51ea97d62989c7ab983a18c6af03762d4c526a0c1946aaf11505e58a
                 ),
                 uint256(
-                    0x0d6a9d289d347c40890ed3515085d0bea632b782091beaf2ca0cd42b16a741c9
+                    0x2697c9e9837fdf0befb8a9eb0fca6565ebbc0f98856ca933768bc7d83003cedb
                 )
             ],
             [
                 uint256(
-                    0x2ff867d00a2d68460d362f06e76de3d4e7e1e5a01d295d9b19f6ad03fe5e0e2b
+                    0x1b20f41b755265fe7ebd1bedf437e8b2578b60e747f4fd058aa81ca180969bcf
                 ),
                 uint256(
-                    0x2a1289545b1a8aeffb9aef582bd38bb6950baa373d18942f16cf361f0ed674ae
+                    0x2f14287423802e3b0be5507353a27305670b621a9d840a721dbfa79a26305b59
                 )
             ]
         ];
 
         uint256[2] memory c = [
             uint256(
-                0x2ca7f361c8500cc44c86037851df435f5262fa827885545b87d9cb19ebccad65
+                0x0752164ed614a76fa149d6916eef81de1d21fe325eb820d95cfe9572378dfb82
             ),
             uint256(
-                0x07e02cee39be2a704390f00bf5f4330e0b4d2fe3c0f9ac2e8e81a6dd899a0b48
+                0x1ef43feae5becb02354ad29719e4296e31e2ac02c20899e619fc1145c4dcd515
             )
         ];
 
-        uint256[1] memory publicSignals = [uint256(1)];
+        uint256[1] memory publicSignals = [uint256(0)];
 
         // Verify the proof - it should still verify because it's cryptographically valid
         bool result = zkolar.verifyCredential(a, b, c, publicSignals);
         assertTrue(
             result,
-            "Below threshold case: proof should verify (but valid=0 in public signal)"
+            "Below threshold case: proof should verify (valid=0 in public signal)"
         );
     }
 

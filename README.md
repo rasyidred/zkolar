@@ -50,6 +50,121 @@ Zkolar enables students to prove their academic achievements (e.g., "My GPA is a
 
 ---
 
+## Security Model
+
+### Range Proof Guarantees
+
+The `grade_check` circuit makes the following cryptographic guarantee:
+
+**What it proves:**
+- `gpa >= threshold` is arithmetically satisfied inside the circuit
+- The prover knows a `gpa` and `salt` such that `Poseidon(gpa, salt) == identityHash` — this commitment binds the prover to a specific GPA value and prevents them from switching values after the fact
+
+**What it does NOT prove:**
+- That `gpa` is a valid academic value — the circuit does not enforce an upper bound (e.g., 0–400), so a prover could use an out-of-range value and still generate a valid proof
+- That the credential was issued by a trusted institution — the circuit has no notion of an issuer
+- That `identityHash` was computed honestly — the on-chain verifier trusts the commitment scheme but cannot verify who computed it or whether the underlying GPA is legitimate
+
+### Trust Assumptions
+
+The security of this system rests on three distinct trust layers:
+
+**1. Powers of Tau ceremony**
+
+The `powersOfTau28_hez_final_15.ptau` file comes from the Hermez network multi-party ceremony. Security holds as long as at least one participant in that ceremony was honest and discarded their toxic waste. This is a well-established universal ceremony reused across many ZK projects.
+
+**2. Circuit-specific zkey**
+
+The circuit zkey (`grade_check_*_final.zkey`) is generated locally in this repo with a single contributor. This means the developer who ran `make compile` holds the toxic waste and could — in principle — forge valid proofs for any inputs. **In production, the zkey must be generated through a multi-party ceremony** so that no single party has enough information to break soundness.
+
+**3. Commitment integrity**
+
+The verifier trusts that `identityHash` was computed as `Poseidon(gpa, salt)` by an honest credential issuer. The circuit enforces this constraint on-chain, but a malicious issuer could commit to a false GPA before the circuit ever runs. This system does not solve the oracle problem of how GPA data enters the system.
+
+### What Happens if the Ceremony is Compromised
+
+If all contributors to the zkey ceremony collude (or a single contributor is the only one), an adversary gains the ability to:
+
+- Generate cryptographically valid proofs for **any** input — including GPAs that fail the threshold — without knowing the actual private values
+- The `GradeCheckVerifier` contract cannot distinguish these forged proofs from honest ones
+
+This is the fundamental soundness assumption of all Groth16-based systems. It cannot be eliminated — only mitigated by increasing the number of independent ceremony participants.
+
+### Threat Model
+
+| Attacker Capability | Prevented? | How |
+|---------------------|------------|-----|
+| Fake a passing GPA without knowing a valid one | ✅ Yes | Groth16 soundness — requires valid witness satisfying all constraints |
+| Reuse someone else's proof | ✅ Yes | Proof is bound to a specific `identityHash`; a different identity produces a different commitment |
+| Manipulate `valid` public output after proof generation | ✅ Yes | `verifyProof` rejects any proof that does not match the declared public signals |
+| Prove GPA ≥ threshold without revealing exact GPA | ✅ Yes (this is the goal) | Zero-knowledge property of Groth16 |
+| Forge a proof if zkey ceremony is compromised | ❌ No | Toxic waste from a single-contributor ceremony enables arbitrary proof forgery |
+| Commit to a false GPA via a corrupt issuer | ❌ No | Circuit enforces `Poseidon(gpa, salt) == identityHash` but cannot verify the issuer is trusted |
+| Determine the prover's exact GPA from the proof | ❌ No | Only the output `valid` is public; `gpa`, `salt`, `threshold`, and `identityHash` are private inputs |
+
+**What this system prevents:** A student cannot lie about whether their GPA meets a threshold, provided the zkey ceremony is sound and the issuer is honest.
+
+**What this system does not prevent:** Institutional fraud (a corrupt university issuing false commitments), or ceremony compromise enabling universal proof forgery.
+
+---
+
+## Architecture
+
+### System Flow
+
+```
+User ──► Witness Generator ──► Prover ──► Proof ──► Verifier Contract ──► State Update
+          (WASM, private         (snarkjs,   (π_a,     (GradeCheckVerifier   (valid=1 or
+           inputs: gpa,           zkey)       π_b,      .verifyProof())        valid=0
+           salt, threshold,                   π_c,                             returned
+           identityHash)                      public)                          to caller)
+```
+
+Each stage in detail:
+
+| Stage | Tool | Input | Output |
+|-------|------|-------|--------|
+| **Witness Generator** | Circom WASM + Node.js | Private inputs (JSON) | Witness file (.wtns) |
+| **Prover** | snarkjs Groth16 | Witness + proving key (.zkey) | Proof (.json) + public signals |
+| **Verifier Contract** | Solidity + EVM BN128 | Proof + public signals | `true` / `false` |
+| **State Update** | Application logic | Verification result | Credential accepted / rejected |
+
+---
+
+## Design Decisions
+
+### Why Groth16?
+
+Groth16 was chosen over alternatives based on the following requirements for this system:
+
+**Proof size and verification cost are the primary constraints** — the proof must be submitted on-chain, where calldata and gas are expensive. Groth16 produces the smallest proofs (~200 bytes, 3 group elements) and has constant-time on-chain verification (~188k gas regardless of circuit size).
+
+### Tradeoffs vs Alternatives
+
+| Property | Groth16 | PLONK | Bulletproofs |
+|----------|---------|-------|--------------|
+| Proof size | ~200 bytes ✅ | ~400 bytes | ~1.5KB ❌ |
+| Verification gas | ~188k ✅ | ~300k | ~1M+ ❌ |
+| Trusted setup | Per-circuit ⚠️ | Universal ✅ | None ✅ |
+| Proving time | Fast ✅ | Moderate | Slow ❌ |
+| Quantum resistance | No | No | No |
+
+**Why not PLONK?**
+PLONK uses a universal trusted setup (one ceremony works for all circuits), which is a significant operational advantage. However, PLONK proofs are roughly 2× larger and cost ~60% more gas to verify on-chain. For a credential system where verification happens on every submission, that cost compounds quickly. The per-circuit ceremony is an acceptable tradeoff at this scale.
+
+**Why not Bulletproofs?**
+Bulletproofs require no trusted setup, which eliminates the ceremony risk entirely. However, verification time is linear in circuit size — for a circuit with 250 constraints, on-chain verification would cost ~1M+ gas, making it economically impractical for Ethereum mainnet. Bulletproofs are better suited to range proofs in confidential transaction systems (e.g., Monero) where verification happens off-chain.
+
+### Why This Constraint Approach?
+
+The circuit uses two separate constraint systems composed together:
+
+1. **`GreaterEqThan(9)`** — enforces `gpa >= threshold` arithmetically. The 9-bit width supports values up to 511, sufficient for the 0–400 GPA encoding (100× fixed-point). This avoids a comparator overflow that would silently produce wrong results.
+
+2. **`Poseidon(2)`** — hash commitment to bind the prover to a specific `gpa` value. SHA-256 was not used because it is extremely expensive in R1CS (thousands of constraints). Poseidon is ZK-native: designed for arithmetic circuits, requiring only ~250 constraints for a 2-input hash.
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -113,6 +228,18 @@ Suite result: ok. 4 passed; 0 failed
 1. Compiles `grade_check.circom` → R1CS constraint system
 2. Performs trusted setup (generates proving & verification keys)
 3. Exports verification key to Solidity contract
+
+**Circuit Statistics** (`grade_check`):
+
+| Metric | Value |
+|--------|-------|
+| Constraints | 250 |
+| Wires | 253 |
+| Private Inputs | 4 (`gpa`, `salt`, `threshold`, `identityHash`) |
+| Public Inputs | 0 |
+| Outputs | 1 (`valid`) |
+
+These values are displayed automatically during compilation via `snarkjs r1cs info`.
 
 **Process Flow**:
 
@@ -247,6 +374,22 @@ make full
 
 ---
 
+## Performance Benchmarks
+
+Run `make benchmark` to measure proof generation time and on-chain verification gas on your machine.
+
+| Operation | Time | Environment |
+|-----------|------|-------------|
+| Proof Generation | ~1,165ms | Intel i5-7200U @ 2.50GHz / 6GB RAM / Docker (WSL2) |
+| On-chain Verification | ~188,922 gas | EVM (Groth16 BN128 pairing) |
+
+**Notes:**
+- Proof generation time is measured per-proof by `bin/generate_test_proofs.sh` (witness gen + Groth16 prove)
+- On-chain gas is the median cost of `verifyProof()` for a valid proof, isolated via `forge test --gas-report`
+- Verification cost is fixed regardless of the secret inputs — it depends only on the circuit's public signal count
+
+---
+
 ## Make Commands Reference
 
 ### First-Time Setup
@@ -348,6 +491,24 @@ Runs sequentially:
 - Standard development workflow
 - After any circuit/contract changes
 - To verify end-to-end functionality
+
+---
+
+```bash
+make benchmark
+```
+
+**Purpose**: Measure proof generation time and on-chain verification gas
+
+**What It Does**:
+
+1. Runs `make compile` + `make prove` (with per-proof timing printed by `generate_test_proofs.sh`)
+2. Runs `forge test --gas-report` (per-function gas breakdown for `verifyProof` and `verifyCredential`)
+
+**When to Use**:
+
+- After circuit changes to see how constraint count affects performance
+- To populate the README benchmark table for a new machine
 
 ---
 

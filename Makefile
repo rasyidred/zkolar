@@ -6,7 +6,7 @@
 .PHONY: help build build-dev build-ci build-prod \
         dev shell compile prove test anvil anvil-bg anvil-stop \
         clean clean-volumes clean-all \
-        logs status init full ci playground
+        logs status init full ci playground benchmark
 
 # Default target
 .DEFAULT_GOAL := help
@@ -64,6 +64,7 @@ help:
 	@echo "  make init           Initialize volumes and dependencies"
 	@echo "  make full           Full workflow (compile + prove + test)"
 	@echo "  make ci             CI workflow (test only)"
+	@echo "  make benchmark      Measure proof generation time and on-chain gas cost"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make logs           View container logs"
@@ -215,3 +216,11 @@ full: compile prove test
 # CI workflow: test only (assumes artifacts exist)
 ci: test
 	@echo "CI workflow complete"
+
+# Benchmark: proof generation time + on-chain verification gas
+benchmark: compile prove
+	@echo ""
+	@echo "========================================="
+	@echo "On-chain Verification Gas Report"
+	@echo "========================================="
+	$(DOCKER_COMPOSE) run --rm test forge test --gas-report
